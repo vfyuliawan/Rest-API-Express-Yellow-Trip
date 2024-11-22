@@ -13,7 +13,7 @@ app.use(cors({
 
 app.get('/api/taxi-trips', async (req, res) => {
   try {
-    const { vendor_id, payment_type, page = 0, pageSize = 10, passenger_count, pickup_datetime_start, pickup_datetime_end} = req.query;
+    const { vendor_id, payment_type, page = 0, pageSize = 10, passenger_count, pickup_datetime_start, pickup_datetime_end } = req.query;
 
     let query = `
       SELECT 
@@ -59,19 +59,19 @@ app.get('/api/taxi-trips', async (req, res) => {
         }
       }
 
-    if (pickup_datetime_start && pickup_datetime_end) {
-      const startDate = new Date(pickup_datetime_start);
-      const endDate = new Date(pickup_datetime_end);
-      
-      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-        conditions.push(`pickup_datetime BETWEEN "${pickup_datetime_start}" AND "${pickup_datetime_end}"`);
-      } else {
-        return res.status(400).json({
-          message: "Invalid pickup_datetime format",
-          statusCode: 400
-        });
+      if (pickup_datetime_start && pickup_datetime_end) {
+        const startDate = new Date(pickup_datetime_start);
+        const endDate = new Date(pickup_datetime_end);
+
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          conditions.push(`pickup_datetime BETWEEN "${pickup_datetime_start}" AND "${pickup_datetime_end}"`);
+        } else {
+          return res.status(400).json({
+            message: "Invalid pickup_datetime format",
+            statusCode: 400
+          });
+        }
       }
-    }
 
       query += conditions.join(" AND ");
     }
@@ -83,7 +83,7 @@ app.get('/api/taxi-trips', async (req, res) => {
 
     const response = await axios.get(NYC_TAXI_DATA_URL, { params: queryParams });
 
-    const totalRecords = response.data.length; 
+    const totalRecords = response.data.length;
     const totalPages = Math.ceil(totalRecords / pageSize);
 
     res.json({
@@ -108,6 +108,41 @@ app.get('/api/taxi-trips', async (req, res) => {
     });
   }
 });
+
+
+app.get('/api/taxi-trips/payment-summary', async (req, res) => {
+  const { startDate, endDate } = req.query;  
+  try {
+    let query = 'SELECT payment_type, sum(total_amount) AS sum_total_amount';
+
+    if (startDate && endDate) {
+      query += ` WHERE pickup_datetime BETWEEN "${startDate}" AND "${endDate}"`;
+    }
+
+    query += ' GROUP BY payment_type';
+
+    const response = await axios.get(NYC_TAXI_DATA_URL, {
+      params: { $query: query }
+    });
+
+    res.json({
+      data: response.data,
+      message: "Success",
+      messageError: null,
+      statusCode: response.status
+    });
+  } catch (error) {
+    console.error(`Error fetching payment type summary: ${error.message}`);
+    res.status(500).json({
+      data: null,
+      message: "Failed",
+      messageError: error.message,
+      statusCode: 500
+    });
+  }
+});
+
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
